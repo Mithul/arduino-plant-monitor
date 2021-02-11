@@ -6,7 +6,7 @@ const byte light_pin = A5;
 int min_pin = 270;
 int max_pin = 410;
 const byte enable_pin = 7;
-const int poll_interval = 1000;
+const unsigned long poll_interval = 60000L;
 const int power_on_wait_time = 100;
 const int sample_size = 10;
 

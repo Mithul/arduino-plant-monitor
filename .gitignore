@@ -1,7 +1,8 @@
-*.bak
+*.bak*
 *.tags*
 *.sqlite3
 *.sqlite
 *.sqlite-*
 *.sqlite3-*
 node_modules
+*.log

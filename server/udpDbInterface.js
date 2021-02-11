@@ -1,11 +1,13 @@
 const dgram = require('dgram');
 const server = dgram.createSocket('udp4');
 const INTERVAL = 1;
+const logger = require('./logger').logger;
+
 var sqlite3 = require('sqlite3').verbose();
 var db = new sqlite3.Database('db.sqlite3');
 var start = -1;
 db.serialize(function() {
-  db.run("DROP TABLE moisture")
+  // db.run("DROP TABLE moisture")
   db.run("CREATE TABLE IF NOT EXISTS moisture (plant_id INTEGER, moisture DECIMAL(2, 2), timestamp DECIMAL(10))");
   db.run("CREATE TABLE IF NOT EXISTS light (light DECIMAL(2, 2), timestamp DECIMAL(10))");
 
@@ -28,23 +30,25 @@ server.on('error', (err) => {
 });
 
 server.on('message', (msg, rinfo) => {
-  console.log(`server got: ${msg} Len ${msg.length} from ${rinfo.address}:${rinfo.port} ${JSON.stringify(msg)}`);
-  if(msg.length > 24){
+  logger.info(`server got: ${msg} Len ${msg.length} from ${rinfo.address}:${rinfo.port} ${JSON.stringify(msg)}`);
+  if(msg.length > 37){
     return;
   }
   if(start == -1 || Date.now() - start > 1000){
     db.serialize(function() {
       var moistures = (''+msg).split(' ');
-      moistures.pop(); // blank
+      var date = moistures.pop(); // blank
       var light = moistures.pop();
-      var date = Date.now();
+      // var date = Date.now();
       var stmt = db.prepare("INSERT INTO moisture VALUES (?, ?, ?)");
       moistures.forEach((moisture, i) => {
+        logger.debug("INSERT INTO moisture VALUES (?, ?, ?)", i, moisture, date)
         stmt.run(i, moisture, date);
       })
       stmt.finalize();
+      logger.debug("INSERT INTO light VALUES (?, ?)", light, date)
       db.run("INSERT INTO light VALUES (?, ?)", light, date);
-      console.log(moistures)
+      logger.info(JSON.stringify({'moitures': moistures, 'light': light, 'date': date}))
     })
 
     start = Date.now();
@@ -53,7 +57,7 @@ server.on('message', (msg, rinfo) => {
 
 server.on('listening', () => {
   const address = server.address();
-  console.log(`server listening ${address.address}:${address.port}`);
+  logger.info(`server listening ${address.address}:${address.port}`);
 });
 
 server.bind(3333);
