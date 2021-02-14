@@ -42,7 +42,7 @@ const useInterval = (callback, delay) => {
     function tick() {
       savedCallback.current();
     }
-    
+
     if (delay !== null) {
       let id = setInterval(tick, delay);
       return () => clearInterval(id);
@@ -55,13 +55,13 @@ export default function App () {
   let lightData = {};
   let [granularity, setGranularity] = useState('3600');
   let [data, setData] = useState({ 'labels': [], 'datasets': [] });
-  
+
   // granularity selection CHART_OPTIONS
   const granularitySelectionOptions = [{ value: '60', label: 'Minute' }, { value: '1', label: 'Second' }, { value: '3600', label: 'Hour' } ];
 
   // Get Data
   const getData = async () => {
-    const res = await fetch(`http://10.0.0.6:3000/data.json?granularity=${granularity}`);
+    const res = await fetch(`http://localhost:3000/data.json?granularity=${granularity}`);
     const json = await res.json() || {};
     moistureData = json.moisture;
     lightData = json.light;
