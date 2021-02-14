@@ -1,117 +1,162 @@
 /* App.js */
 
-import logo from './logo.svg';
-import './App.css';
+import React, { useState, useEffect } from 'react';
 import Select from 'react-select'
-import {Line} from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
+import MomentJS from 'moment';
+import './styles/App.css';
+import {
+  PLANT_COLORS,
+  LIGHT,
+} from './constants/colors';
 
-var React = require('react');
-var Component = React.Component;
-var CanvasJSReact = require('canvasjs-react-charts');
-var CanvasJS = CanvasJSReact.CanvasJS;
-var CanvasJSChart = CanvasJSReact.CanvasJSChart;
-var MomentJS = require('moment');
+const DEFAULT_DATASET_OPTS = {
+  type: 'line',
+  fill: false,
+  lineTension: 0.5,
+  pointRadius: 0,
+  hitRadius: 3,
+};
 
-const default_dataset_opts = {type: 'line', fill: false, lineTension: 0.5, pointRadius:0, hitRadius:3}
-
-class App extends Component {
-  constructor(props) {
-    super(props);
-    this.poller = null;
-    this.state = {
-      moisture_data : {},
-      light_data: {},
-      granularity: '3600'
-    };
-    this.colors = ['#004d40', '#39796b', '#2e7d32', '#60ad5e', '#005005', '#827717', '#b4a647', '#524c00']
-  }
-
-  getData = () => {
-    fetch("http://10.0.0.236:3000/data.json?granularity="+this.state.granularity)
-      .then(res => res.json())
-      .then(
-        (result) => {
-          this.setState({
-            moisture_data: result.moisture,
-            light_data: result.light,
-          });
-        },
-        (error) => {
-          this.setState({
-            moisture_data : {},
-            light_data: {},
-          });
-        }
-      )
-  }
-  componentDidMount() {
-    this.getData();
-    this.poller = setInterval(this.getData, 10000);
-  }
-
-  componentWillUnmount() {
-    clearInterval(this.poller);
-  }
-
-  timeChange = e => {
-    console.log("Change", e)
-    this.setState({granularity: e ? e.value : '1'}, this.getData);
-
-  }
-
-  render() {
-    console.log(this.state)
-      var data = {'labels': [], 'datasets': []}
-      var options = {
-        scales: {
-            xAxes: {
-                type: 'time',
-                distribution: 'series'
-            }
-        }, tooltips: {
-          mode: 'x'
-        }
+// chart options
+const CHART_OPTIONS = {
+  scales: {
+    xAxes: {
+      type: 'time',
+      distribution: 'series'
     }
-      var moisture_data = this.state.moisture_data;
-      var light_data = this.state.light_data;
-      var time_done = false;
-      for(var plant_id in moisture_data){
-        if(moisture_data.hasOwnProperty(plant_id)){
-          var plant_data = moisture_data[plant_id];
-          var dataPoints = []
-          var timestamps = Object.keys(plant_data).sort()
-          timestamps.forEach((timestamp, i) => {
-            if(!time_done){
-              data['labels'].push(MomentJS(timestamp*1000).format('ddd, MMM D hh:mm:ss'))
-            }
-            if(plant_data.hasOwnProperty(timestamp)){
-              var moisture = plant_data[timestamp]
-              dataPoints.push(moisture)
-            }
-          });
-          time_done = true;
-          data['datasets'].push({...default_dataset_opts, label: plant_id, 'data': dataPoints, 'borderColor': this.colors[plant_id]})
-        }
-      }
-      var dataPoints = []
-      Object.keys(light_data).sort().forEach((timestamp, i) => {
-        if(light_data.hasOwnProperty(timestamp)){
-            var light = light_data[timestamp]
-            dataPoints.push(light)
-        }
+  }, tooltips: {
+    mode: 'x'
+  },
+  responsive: true,
+};
+
+const useInterval = (callback, delay) => {
+  const savedCallback = React.useRef();
+
+  useEffect(() => {
+    savedCallback.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    function tick() {
+      savedCallback.current();
+    }
+    
+    if (delay !== null) {
+      let id = setInterval(tick, delay);
+      return () => clearInterval(id);
+    }
+  }, [delay]);
+};
+
+export default function App () {
+  let moistureData = {};
+  let lightData = {};
+  let [granularity, setGranularity] = useState('3600');
+  let [data, setData] = useState({ 'labels': [], 'datasets': [] });
+  
+  // granularity selection CHART_OPTIONS
+  const granularitySelectionOptions = [{ value: '60', label: 'Minute' }, { value: '1', label: 'Second' }, { value: '3600', label: 'Hour' } ];
+
+  // Get Data
+  const getData = async () => {
+    const res = await fetch(`http://10.0.0.6:3000/data.json?granularity=${granularity}`);
+    const json = await res.json() || {};
+    moistureData = json.moisture;
+    lightData = json.light;
+  };
+
+  const fillLabelsFromData = (_data) => {
+    let labels = [];
+    const timestamps = Object.keys(_data).sort();
+    timestamps.forEach((timestamp) => {
+      labels.push(MomentJS(timestamp * 1000).format('ddd, MMM D hh:mm:ss'));
+    });
+
+    return labels;
+  };
+
+  const createMoistureObject = () => {
+    let dataPoints = [];
+    let localData = {'labels': [], 'datasets': []};
+    const moistureEntries = Object.entries(moistureData);
+
+    // Fill datasets
+    moistureEntries.forEach((moistureEntry) => {
+      const moistureIndex = moistureEntry[0];
+      const moistureObject = moistureEntry[1];
+      let plantData = moistureObject;
+      let timestamps = Object.keys(plantData).sort();
+      dataPoints = [];
+
+      timestamps.forEach((timestamp) => {
+        let moistureValue = plantData[timestamp];
+        dataPoints.push(moistureValue);
       });
-      data['datasets'].push({...default_dataset_opts, label: 'light', data: dataPoints, 'borderColor': '#ffca28'})
 
+      localData['datasets'].push({...DEFAULT_DATASET_OPTS, label: moistureIndex, 'data': dataPoints, 'borderColor': PLANT_COLORS[moistureIndex]});
+    });
 
-      const timeOptions = [{value: "60", label: "Minute"}, {value: "1", label: "Second"}, {value: "3600", label: "Hour"}]
-      console.log(data)
-  		return (
-  	    <div>
-          <Select options={timeOptions} defaultValue="s" onChange={this.timeChange}/>
-          <Line data={data} options={options}/>
-    		</div>
-  		);
-  }
+    return localData;
+  };
+
+  const createLightObject = () => {
+    let dataPoints = [];
+    let localData = {'datasets': []};
+
+    Object.keys(lightData).sort().forEach((timestamp) => {
+      let lightValue = lightData[timestamp];
+      dataPoints.push(lightValue);
+    });
+
+    localData['datasets'].push({...DEFAULT_DATASET_OPTS, label: 'light', data: dataPoints, 'borderColor': LIGHT });
+
+    return localData;
+  };
+
+  // Fetch and construct plant monitor data to be graphed
+  const getPlantMonitorData = async () => {
+    // fetch new data
+    await getData();
+    let labels = fillLabelsFromData(lightData);
+
+    // construct new data points in chart
+    let dataMoisture = createMoistureObject();
+    let dataLight = createLightObject();
+    const dataSets = [
+      ...dataMoisture.datasets,
+      ...dataLight.datasets,
+    ];
+
+    setData({
+      datasets: dataSets,
+      labels: labels,
+    });
+  };
+
+  // Poll plant data at set intervals
+  useInterval(async () => {
+    console.log('Polling plant monitor data...');
+
+    await getPlantMonitorData();
+  }, 10000);
+
+  // selection handler in chart
+  const onTimeChangeHandler = async e => {
+    const newGranularity = e ? e.value : '1';
+    setGranularity(newGranularity);
+  };
+
+  // Run when granularity is changed via select handler
+  useEffect(async () => {
+    await getPlantMonitorData();
+  }, [granularity]);
+
+  return (
+    <div>
+      <Select options={granularitySelectionOptions} defaultValue="s" onChange={onTimeChangeHandler} />
+      <Line data={data} options={CHART_OPTIONS}/>
+    </div>
+  );
 }
-
-export default App;
