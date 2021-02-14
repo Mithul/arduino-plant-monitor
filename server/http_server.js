@@ -23,8 +23,14 @@ let expressLogger = (req, res, next) => {
   let method = req.method;
   let url = req.url;
   let status = res.statusCode;
-  let log = `[${formatted_date}] ${method}:${url} ${status}`;
-  logger.info(log)
+
+  var start = Date.now();
+  res.on('close', function() {
+    var duration = Date.now() - start;
+    let log = `[${formatted_date}] ${method}:${url} ${status} ${JSON.stringify(req.query)} - ${duration} ms`;
+    logger.info(log)
+    // log duration
+  });
   next();
 };
 
@@ -33,80 +39,101 @@ app.use(cors())
 
 
 const max_moisture = 720
-const min_moisture = 318
+const min_moisture = 450
 
-app.get('/data.json', (req, res) => {
-  console.log("Gran",req.query.granularity)
-  var data = {'moisture': {}, 'light': {}}
-  var granularity = +req.query.granularity
-  var timestamps = new Set()
-  var start_timestamp = null
-  var end_timestamp = null
-  db.each("SELECT max(end_time) as end_time, min(start_time) as start_time FROM \
-  (SELECT max(timestamp) as end_time, min(timestamp) as start_time FROM moisture UNION \
-  SELECT max(timestamp) as end_time, min(timestamp) as start_time FROM light)", function(err, row){
-    if(err !== null){
-      console.log("MXMNErr " + err)
-    }
-    console.log("row " + JSON.stringify(row))
-    start_timestamp = Math.floor(row.start_time)
-    end_timestamp = Math.floor(row.end_time)
-  }, function(err){
-    console.log("doneMX " + err)
+const getTimeRange = () => {
+  return new Promise((resolve, reject) => {
+    var start_timestamp, end_timestamp;
+    db.each("SELECT max(end_time) as end_time, min(start_time) as start_time FROM \
+    (SELECT max(timestamp) as end_time, min(timestamp) as start_time FROM moisture UNION \
+    SELECT max(timestamp) as end_time, min(timestamp) as start_time FROM light)", function(err, row){
+      if(err) reject(err)
+      start_timestamp = Math.floor(row.start_time)
+      end_timestamp = Math.floor(row.end_time)
+    }, function(err){
+      if(err) reject(err)
+      resolve({start_timestamp, end_timestamp})
+    })
+  })
+}
+
+const getMoistureData = ({ granularity, start_timestamp, end_timestamp }) => {
+  return new Promise((resolve, reject) => {
+    var moisture_data = {};
+    var moisture_timestamps = new Set();
     db.each(`SELECT timestamp, plant_id, avg(moisture) as moisture FROM moisture group by timestamp/${granularity}, plant_id`, function(err, row) {
-      // console.log("RE" + JSON.stringify(err) )
-      if(err !== null){
-        return;
-      }
-      // console.log(row.plant_id + ": " + row.moisture + ": " + row.timestamp);
-      if(!data['moisture'][row.plant_id]){
-        data['moisture'][row.plant_id] = {}
+      if(err) reject(err)
+      if(!moisture_data[row.plant_id]){
+        moisture_data[row.plant_id] = {}
       }
       timestamp = Math.floor(row.timestamp)
-      timestamps.add(timestamp)
-      // data['moisture'][row.plant_id][timestamp] = row.moisture
-      data['moisture'][row.plant_id][timestamp] = (1024 - row.moisture - min_moisture)*100/(max_moisture - min_moisture)
-      if(data['moisture'][row.plant_id][timestamp] < 0){
-        data['moisture'][row.plant_id][timestamp] = 0;
+      moisture_timestamps.add(timestamp)
+      moisture_data[row.plant_id][timestamp] = (1024 - row.moisture - min_moisture)*100/(max_moisture - min_moisture)
+      if(moisture_data[row.plant_id][timestamp] < 0){
+        moisture_data[row.plant_id][timestamp] = null;
       }
-      // console.log(JSON.stringify(data))
-      // console.log(JSON.stringify(data[row.timestamp]))
     }, function(err){
-      db.each(`SELECT timestamp, avg(light) as light FROM light group by timestamp/${granularity}`, function(err, row) {
-        timestamp = Math.floor(row.timestamp)
-        timestamps.add(timestamp)
-        // data['light'][timestamp] = row.light
-        data['light'][timestamp] = (1024 - row.light)*150/1024
-        if(data['light'][timestamp] > 100){
-          data['light'][timestamp] = 100;
-        }
-      }, function(err){
-        console.log("done " + err)
-        var count = 0;
-        timestamps = Array.from(timestamps).sort();
-        timestamps.forEach((timestamp, i) => {
-          for(var plant_id in data['moisture']){
-            var plant_data = data['moisture'][plant_id]
-              if(!plant_data[timestamp]){
-                // console.log(plant_id + " " + timestamp + " " + null)
-                plant_data[timestamp] = null;
-                count += 1;
-              }
-          }
-          if(!data['light'][timestamp]){
-            // console.log(plant_id + " " + timestamp + " " + null)
-            data['light'][timestamp] = null;
-            count += 1;
-          }
-        });
-        console.log("zeroed",count);
-        logger.info(data['light'])
-        logger.info(Object.keys(data['light']).length)
-        res.send(JSON.stringify(data))
-      });
+      if(err) reject(err)
+      resolve({moisture_data, moisture_timestamps})
     });
-  })
+  });
+}
 
+const getLightData = ({granularity, start_timestamp, end_timestamp}) => {
+  return new Promise((resolve, reject) => {
+    var light_data = {};
+    var light_timestamps = new Set();
+    db.each(`SELECT timestamp, avg(light) as light FROM light group by timestamp/${granularity}`, function(err, row) {
+      if(err) reject(err)
+      timestamp = Math.floor(row.timestamp)
+      light_timestamps.add(timestamp)
+      light_data[timestamp] = (1024 - row.light)*150/1024
+      if(light_data[timestamp] > 100){
+        light_data[timestamp] = 100;
+      }
+    }, function(err){
+      if(err) reject(err)
+      resolve({light_data, light_timestamps})
+    });
+  });
+}
+
+const fillAllTimestamps = (data, timestamps, fill_value=null) => {
+  var count = 0;
+  timestamps = Array.from(timestamps).sort();
+  timestamps.forEach((timestamp, i) => {
+    for(var plant_id in data['moisture']){
+      var plant_data = data['moisture'][plant_id]
+        if(!plant_data[timestamp]){
+          // console.log(plant_id + " " + timestamp + " " + null)
+          plant_data[timestamp] = null;
+          count += 1;
+        }
+    }
+    if(!data['light'][timestamp]){
+      // console.log(plant_id + " " + timestamp + " " + null)
+      data['light'][timestamp] = null;
+      count += 1;
+    }
+  });
+  return data;
+}
+
+
+app.get('/data.json', async (req, res) => {
+  var granularity = +req.query.granularity
+  try{
+    const time_range = await getTimeRange();
+    const {moisture_data, moisture_timestamps} = await getMoistureData({...time_range, granularity})
+    const {light_data, light_timestamps} = await getLightData({...time_range, granularity})
+    const data = {light: light_data, moisture: moisture_data}
+    var timestamps = new Set([...moisture_timestamps, ...light_timestamps])
+    fillAllTimestamps(data, timestamps, null) // in place fills data with nulls for unfilled timestamps
+    res.send(JSON.stringify(data))
+  }catch(err){
+    logger.error(err)
+    res.send(JSON.stringify({light: {}, moisture: {}}))
+  }
 })
 
 app.listen(port, () => {

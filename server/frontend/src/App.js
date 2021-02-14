@@ -12,7 +12,7 @@ var CanvasJS = CanvasJSReact.CanvasJS;
 var CanvasJSChart = CanvasJSReact.CanvasJSChart;
 var MomentJS = require('moment');
 
-const default_dataset_opts = {type: 'line', fill: false, lineTension: 0.5, pointRadius:0,}
+const default_dataset_opts = {type: 'line', fill: false, lineTension: 0.5, pointRadius:0, hitRadius:3}
 
 class App extends Component {
   constructor(props) {
@@ -21,7 +21,7 @@ class App extends Component {
     this.state = {
       moisture_data : {},
       light_data: {},
-      granularity: '60'
+      granularity: '3600'
     };
     this.colors = ['#004d40', '#39796b', '#2e7d32', '#60ad5e', '#005005', '#827717', '#b4a647', '#524c00']
   }
@@ -68,6 +68,8 @@ class App extends Component {
                 type: 'time',
                 distribution: 'series'
             }
+        }, tooltips: {
+          mode: 'x'
         }
     }
       var moisture_data = this.state.moisture_data;
@@ -106,7 +108,7 @@ class App extends Component {
   		return (
   	    <div>
           <Select options={timeOptions} defaultValue="s" onChange={this.timeChange}/>
-          <Line data={data}/>
+          <Line data={data} options={options}/>
     		</div>
   		);
   }
