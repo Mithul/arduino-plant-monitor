@@ -2,32 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select'
-import { Line } from 'react-chartjs-2';
-import MomentJS from 'moment';
-import MoistureLightChart from './MoistureLightChart';
-import SunlightChart from './SunlightChart';
-import PlantSensorMapper from './PlantSensorMapper';
+import MoistureLightChart from './components/MoistureLightChart';
+import SunlightChart from './components/SunlightChart';
 import './styles/App.css';
-
-
-const useInterval = (callback, delay) => {
-  const savedCallback = React.useRef();
-
-  useEffect(() => {
-    savedCallback.current = callback;
-  }, [callback]);
-
-  useEffect(() => {
-    function tick() {
-      savedCallback.current();
-    }
-
-    if (delay !== null) {
-      let id = setInterval(tick, delay);
-      return () => clearInterval(id);
-    }
-  }, [delay]);
-};
+import Container  from 'react-bootstrap/Container';
+import { POLL_INTERVAL } from './constants';
+import { useInterval } from './utils';
 
 export default function App () {
   let [moistureData, setMoistureData] = useState({});
@@ -42,10 +22,10 @@ export default function App () {
   const getData = async () => {
     const res = await fetch(`http://localhost:3000/data.json?granularity=${granularity}`);
     const json = await res.json() || {};
-    setMoistureData(json.moisture)
-    setLightData(json.light)
-    setSunlightData(json.sunlight)
-    return json;
+
+    setMoistureData(json.moisture);
+    setLightData(json.light);
+    setSunlightData(json.sunlight);
   };
 
   // Fetch and construct plant monitor data to be graphed
@@ -57,7 +37,7 @@ export default function App () {
   // Poll plant data at set intervals
   useInterval(async () => {
     await getPlantMonitorData();
-  }, 10000);
+  }, POLL_INTERVAL);
 
   // selection handler in chart
   const onTimeChangeHandler = async e => {
@@ -71,11 +51,16 @@ export default function App () {
   }, [granularity]);
 
   return (
-    <div>
-      <Select options={granularitySelectionOptions} defaultValue="s" onChange={onTimeChangeHandler} />
+    <Container fluid>
+      <h1 align="center">Plant Monitoring Dashboard</h1>
+      <h3>Select Granularity</h3>
+      <Select
+        options={granularitySelectionOptions}
+        defaultValue={{ value: '3600', label: 'Hour' }}
+        onChange={onTimeChangeHandler}
+      />
       <MoistureLightChart moistureData={moistureData} lightData={lightData}/>
       <SunlightChart sunlightData={sunlightData} />
-      {/*<Line data={data} options={CHART_OPTIONS}/>*/}
-    </div>
+    </Container>
   );
 }
