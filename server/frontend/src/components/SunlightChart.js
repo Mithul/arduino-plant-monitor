@@ -30,7 +30,21 @@ const CHART_OPTIONS = {
     }
 };
 
-export default function SunlightChart({ sunlightData }) {
+export default function SunlightChart({ granularity }) {
+  let [sunlightData, setSunlightData] = useState({});
+
+  // Get Data
+  const getData = async () => {
+    let res = await fetch(`http://localhost:3000/sunlight-stats.json?granularity=${granularity}`);
+    let json = await res.json() || {};
+    setSunlightData(json.sunlight);
+  };
+
+  // Poll plant data at set intervals
+  // useInterval(async () => {
+  //   await getPlantMonitorData();
+  // }, POLL_INTERVAL);
+
   const createSunlightObject = () => {
     let _data = getDefaultDataObject();
     let durationDataPoints = [];
@@ -50,6 +64,10 @@ export default function SunlightChart({ sunlightData }) {
 
     return _data;
   };
+
+  useEffect(async () => {
+    await getData();
+  }, [granularity]);
 
   return (
     <Bar data={createSunlightObject} options={CHART_OPTIONS} />

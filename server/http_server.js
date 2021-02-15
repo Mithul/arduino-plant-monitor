@@ -27,7 +27,7 @@ let expressLogger = (req, res, next) => {
   var start = Date.now();
   res.on('close', function() {
     var duration = Date.now() - start;
-    let log = `[${formatted_date}] ${method}:${url} ${status} ${JSON.stringify(req.query)} - ${duration} ms`;
+    let log = `[${formatted_date}] ${method}:${url} ${status} ${JSON.stringify(req.query)} - ${duration} ms : ${req.ip}`;
     logger.info(log)
     // log duration
   });
@@ -140,20 +140,33 @@ app.post('/plantSensor.json', async (req, res) => {
   res.send(JSON.stringify({}))
 })
 
-app.get('/data.json', async (req, res) => {
+app.get('/moisture-light.json', async (req, res) => {
   var granularity = +req.query.granularity
   try{
     const time_range = await getTimeRange();
     const {moisture_data, moisture_timestamps} = await getMoistureData({...time_range, granularity})
     const {light_data, light_timestamps} = await getLightData({...time_range, granularity})
-    const {sunlight_duration} = await getSunlightDuration({...time_range})
-    const data = {light: light_data, moisture: moisture_data, sunlight: sunlight_duration}
+    // const {sunlight_duration} = await getSunlightDuration({...time_range})
+    const data = {light: light_data, moisture: moisture_data}
     var timestamps = new Set([...moisture_timestamps, ...light_timestamps])
     fillAllTimestamps(data, timestamps, null) // in place fills data with nulls for unfilled timestamps
     res.send(JSON.stringify(data))
   }catch(err){
     logger.error("ERROR", err)
     res.send(JSON.stringify({light: {}, moisture: {}, sunlight: {}}))
+  }
+})
+
+app.get('/sunlight-stats.json', async (req, res) => {
+  var granularity = +req.query.granularity
+  try{
+    const time_range = await getTimeRange();
+    const {sunlight_duration} = await getSunlightDuration({...time_range})
+    const data = {sunlight: sunlight_duration}
+    res.send(JSON.stringify(data))
+  }catch(err){
+    logger.error("ERROR", err)
+    res.send(JSON.stringify({sunlight: {}}))
   }
 })
 

@@ -28,8 +28,27 @@ const CHART_OPTIONS = {
   responsive: true,
 };
 
-export default function MoistureLightChart({ moistureData, lightData }) {
+export default function MoistureLightChart({ granularity }) {
   let [data, setData] = useState(getDefaultDataObject());
+  let [moistureData, setMoistureData] = useState({});
+  let [lightData, setLightData] = useState({});
+
+  console.log('Gran: ', granularity)
+
+  // Get Data
+  const getData = async () => {
+    let res = await fetch(`http://localhost:3000/moisture-light.json?granularity=${granularity}`);
+    let json = await res.json() || {};
+
+    setMoistureData(json.moisture);
+    setLightData(json.light);
+  }
+
+  // // Poll plant data at set intervals
+  // useInterval(async () => {
+  //   await getPlantMonitorData();
+  // }, POLL_INTERVAL);
+
   const fillLabelsFromData = (_data) => {
     let labels = [];
     const timestamps = Object.keys(_data).sort();
@@ -94,17 +113,18 @@ export default function MoistureLightChart({ moistureData, lightData }) {
       ...dataLight.datasets,
     ];
 
-    setData({
+    return {
       datasets: dataSets,
       labels: labels,
-    });
+    };
   };
 
   useEffect(async () => {
-    transformDataForPlotting()
-  }, [lightData, moistureData]);
+    await getData();
+
+  }, [granularity]);
 
   return (
-    <Line data={data} options={CHART_OPTIONS} />
+    <Line data={transformDataForPlotting()} options={CHART_OPTIONS} />
   )
 }
