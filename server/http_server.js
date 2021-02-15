@@ -5,6 +5,7 @@ const port = 3000
 var sqlite3 = require('sqlite3').verbose();
 var db = new sqlite3.Database('db.sqlite3');
 const logger = require('./logger').logger;
+var bodyParser = require('body-parser')
 
 let expressLogger = (req, res, next) => {
   let current_datetime = new Date();
@@ -36,6 +37,7 @@ let expressLogger = (req, res, next) => {
 
 app.use(expressLogger)
 app.use(cors())
+app.use(bodyParser.json());
 
 
 const max_moisture = 720
@@ -136,8 +138,16 @@ const fillAllTimestamps = (data, timestamps, fill_value=null) => {
 }
 
 app.post('/plantSensor.json', async (req, res) => {
-  console.log(req)
+  console.log(req.body)
   res.send(JSON.stringify({}))
+})
+
+app.put('/plant/new.json', async (req, res) => {
+  console.log(req.body)
+  db.run("INSERT INTO plant(name) VALUES (?)", req.body.plant_name, function(err){
+    if(err) res.send(JSON.stringify({success: false, error: err}))
+    else res.send(JSON.stringify({success: true}))
+  });
 })
 
 app.get('/moisture-light.json', async (req, res) => {

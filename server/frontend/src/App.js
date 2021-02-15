@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Select from 'react-select'
 import MoistureLightChart from './components/MoistureLightChart';
 import SunlightChart from './components/SunlightChart';
+import PlantSensorMapper from './components/PlantSensorMapper';
+import NewPlantForm from './components/NewPlantForm';
 import './styles/App.css';
 import {Container, Row, Col, Form}  from 'react-bootstrap';
 import { POLL_INTERVAL } from './constants';
@@ -26,15 +28,24 @@ export default function App () {
       <Row>
         <h1 align="center">Plant Monitoring Dashboard</h1>
       </Row>
+
       <Row>
-        <Form>
-          <Form.Label>Select Granularity</Form.Label>
-          <Select
-            options={granularitySelectionOptions}
-            defaultValue={{ value: '3600', label: 'Hour' }}
-            onChange={onTimeChangeHandler}
-          />
-        </Form>
+        <Col>
+          <Form>
+            <Form.Label>Select Granularity</Form.Label>
+            <Select
+              options={granularitySelectionOptions}
+              defaultValue={{ value: '3600', label: 'Hour' }}
+              onChange={onTimeChangeHandler}
+            />
+          </Form>
+        </Col>
+        <Col>
+          <PlantSensorMapper />
+        </Col>
+        <Col>
+          <NewPlantForm />
+        </Col>
       </Row>
       <Row>
         <Col>
