@@ -41,7 +41,7 @@ app.use(cors())
 const max_moisture = 720
 const min_moisture = 450
 
-const getTimeRange = () => {
+const  getTimeRange = () => {
   return new Promise((resolve, reject) => {
     var start_timestamp, end_timestamp;
     db.each("SELECT max(end_time) as end_time, min(start_time) as start_time FROM \
@@ -53,6 +53,22 @@ const getTimeRange = () => {
     }, function(err){
       if(err) reject(err)
       resolve({start_timestamp, end_timestamp})
+    })
+  })
+}
+
+const getSunlightDuration = (time_range) => {
+  return new Promise((resolve, reject) => {
+    var sunlight_duration = {};
+    db.each(`SELECT avg(light) as average_light, min(hour), max(hour), max(hour) - min(hour) + 1 as sunlight_duration, day*3600*24 as day FROM \
+      (SELECT light, cast(timestamp/3600 as int) as hour, cast((timestamp - 3600*8)/(60*60*24) as int) as day from light \
+      group by cast(timestamp/3600 as int)) \
+    where light < 600 group by day`, (err, row) => {
+      if(err) reject(err)
+      sunlight_duration[row.day] = {duration: row.sunlight_duration, average_light: (1024 - row.average_light)*150/1024}
+    }, (err) => {
+      if(err) reject(err)
+      resolve({sunlight_duration})
     })
   })
 }
@@ -119,6 +135,10 @@ const fillAllTimestamps = (data, timestamps, fill_value=null) => {
   return data;
 }
 
+app.post('/plantSensor.json', async (req, res) => {
+  console.log(req)
+  res.send(JSON.stringify({}))
+})
 
 app.get('/data.json', async (req, res) => {
   var granularity = +req.query.granularity
@@ -126,13 +146,14 @@ app.get('/data.json', async (req, res) => {
     const time_range = await getTimeRange();
     const {moisture_data, moisture_timestamps} = await getMoistureData({...time_range, granularity})
     const {light_data, light_timestamps} = await getLightData({...time_range, granularity})
-    const data = {light: light_data, moisture: moisture_data}
+    const {sunlight_duration} = await getSunlightDuration({...time_range})
+    const data = {light: light_data, moisture: moisture_data, sunlight: sunlight_duration}
     var timestamps = new Set([...moisture_timestamps, ...light_timestamps])
     fillAllTimestamps(data, timestamps, null) // in place fills data with nulls for unfilled timestamps
     res.send(JSON.stringify(data))
   }catch(err){
-    logger.error(err)
-    res.send(JSON.stringify({light: {}, moisture: {}}))
+    logger.error("ERROR", err)
+    res.send(JSON.stringify({light: {}, moisture: {}, sunlight: {}}))
   }
 })
 
