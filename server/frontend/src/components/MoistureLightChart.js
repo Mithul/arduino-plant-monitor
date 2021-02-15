@@ -1,12 +1,11 @@
-import Select from 'react-select'
 import { Line } from 'react-chartjs-2';
 import MomentJS from 'moment';
 import React, { useState, useEffect } from 'react';
-
 import {
   PLANT_COLORS,
   LIGHT,
-} from './constants/colors';
+} from '../constants/colors';
+import { getDefaultDataObject } from '../utils';
 
 const DEFAULT_DATASET_OPTS = {
   type: 'line',
@@ -29,13 +28,12 @@ const CHART_OPTIONS = {
   responsive: true,
 };
 
-export default function MoistureLightChart(props){
-  let moistureData = props.moistureData;
-  let lightData = props.lightData;
-  let [data, setData] = useState({labels: [], datasets: []})
+export default function MoistureLightChart({ moistureData, lightData }) {
+  let [data, setData] = useState(getDefaultDataObject());
   const fillLabelsFromData = (_data) => {
     let labels = [];
     const timestamps = Object.keys(_data).sort();
+
     timestamps.forEach((timestamp) => {
       labels.push(MomentJS(timestamp * 1000).format('ddd, MMM D hh:mm:ss'));
     });
@@ -45,7 +43,7 @@ export default function MoistureLightChart(props){
 
   const createMoistureObject = () => {
     let dataPoints = [];
-    let localData = {'labels': [], 'datasets': []};
+    let localData = getDefaultDataObject();
     const moistureEntries = Object.entries(moistureData);
 
     // Fill datasets
@@ -60,7 +58,12 @@ export default function MoistureLightChart(props){
         let moistureValue = plantData[timestamp];
         dataPoints.push(moistureValue);
       });
-      localData['datasets'].push({...DEFAULT_DATASET_OPTS, label: moistureIndex, 'data': dataPoints, 'borderColor': PLANT_COLORS[moistureIndex]});
+      localData['datasets'].push({
+        ...DEFAULT_DATASET_OPTS,
+        label: moistureIndex,
+        'data': dataPoints,
+        'borderColor': PLANT_COLORS[moistureIndex],
+      });
     });
 
     return localData;
@@ -95,13 +98,13 @@ export default function MoistureLightChart(props){
       datasets: dataSets,
       labels: labels,
     });
-  }
+  };
 
   useEffect(async () => {
     transformDataForPlotting()
-  }, [props.lightData, props.moistureData])
+  }, [lightData, moistureData]);
 
   return (
-    <Line data={data} options={CHART_OPTIONS}/>
+    <Line data={data} options={CHART_OPTIONS} />
   )
 }
