@@ -1,13 +1,13 @@
 /* App.js */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Select from 'react-select'
 import MoistureLightChart from './components/MoistureLightChart';
 import SunlightChart from './components/SunlightChart';
-import './styles/App.css';
-import {Container, Row, Col, Form}  from 'react-bootstrap';
-import { POLL_INTERVAL } from './constants';
-import { useInterval } from './utils';
+import Container  from 'react-bootstrap/Container';
+import Row  from 'react-bootstrap/Row';
+import Col  from 'react-bootstrap/Col';
+import Form  from 'react-bootstrap/Form';
 
 export default function App () {
   let [granularity, setGranularity] = useState('3600');
@@ -22,7 +22,7 @@ export default function App () {
   };
 
   return (
-    <Container fluid>
+    <Container>
       <Row>
         <h1 align="center">Plant Monitoring Dashboard</h1>
       </Row>
@@ -46,4 +46,4 @@ export default function App () {
       </Row>
     </Container>
   );
-}
+};
