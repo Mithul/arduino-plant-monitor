@@ -1,13 +1,23 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import {
+  BrowserRouter,
+  Route,
+} from 'react-router-dom';
 import './styles/index.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import App from './App';
+import About from './components/About';
 import reportWebVitals from './reportWebVitals';
+import NavbarHeader from './components/NavbarHeader';
 
 ReactDOM.render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <NavbarHeader />
+      <Route exact path='/' component={App} />
+      <Route exact path='/about' component={About} />
+    </BrowserRouter>
   </React.StrictMode>,
   document.getElementById('root')
 );
